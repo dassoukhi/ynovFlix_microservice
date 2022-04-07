@@ -1,0 +1,93 @@
+version: '3.1'
+services:
+  app-poster:
+    container_name: poster-webservice-app
+    image: poster-webservice-app
+    build: posterBuild/
+    expose:
+      - 8081
+    ports:
+      - 8081:8081
+    depends_on:
+      - mongodb
+      - app-media
+    links:
+      - mongodb
+    environment:
+      - SPRING_DATA_MONGODB_DATABASE=posterDB
+      - SPRING_DATA_MONGODB_PORT=27017
+      - SPRING_DATA_MONGODB_HOST=mongodb
+      - SPRING_DATA_MONGODB_AUTHENTICATION_DATABASE=admin
+      - SPRING_DATA_MONGODB_USERNAME=rootuser
+      - SPRING_DATA_MONGODB_PASSWORD=rootpass
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=create-drop
+      
+  app-media:
+    container_name: media-webservice-app
+    image: media-webservice-app
+    build: refBuild/
+    expose:
+      - 8080
+    ports:
+      - 8080:8080
+    depends_on:
+      - pg
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://pg:5432/mediaDB
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+  react-ynovflix-app:
+    container_name: react-ynovflix-app
+    build: ynovflix-app/
+    ports:
+      - '3000:3000'
+    depends_on:
+      - app-media
+      - server
+      - app-poster
+  
+  server:
+    container_name: usernetflixapi_server_1
+    build: userYnovFlix/
+    ports:
+      - '5000:5000'
+    depends_on:
+      - dbuser
+    command: npm run start
+  migration:
+    build: userYnovFlix/
+    command: ["npm", "run", "migrate", "docker exec usernetflixapi_server_1 npm run migrate"]
+    links:
+      - dbuser
+    depends_on:
+      - dbuser
+      - server
+  dbuser:
+    image: 'postgres'
+    environment:
+      POSTGRES_PASSWORD: '123456'
+      POSTGRES_USER: 'docker'
+  mongodb:
+    image: mongo
+    container_name: mongodb
+    ports:
+      - 27017:27017
+    volumes:
+      - data:/data
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=rootuser
+      - MONGO_INITDB_ROOT_PASSWORD=rootpass
+  pg:
+    image: postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=mediaDB
+volumes:
+  data: {}
+networks:
+  default:
+    name: mongodb_network 
